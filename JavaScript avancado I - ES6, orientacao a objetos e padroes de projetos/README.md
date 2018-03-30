@@ -3202,3 +3202,870 @@ Nosso objetivo era chamar na View a função update(), quando o modelo fosse atual
 
 Desta forma, conseguimos cadastrar as negociações, sendo atualizada no modelo e este notificará a View que deverá ser renderizada.
 
+<h2>Construindo um template dinâmico com a função map</h2>
+A função update() para atualização da View está funcionando e a tabela já pode ser visualizada abaixo do formulário. Porém, os dados do modelo ainda não são levados em consideração na construção dinâmica da tabela. Primeiramente, passaremos a ListaNegociacoes como parâmetro do método update(). Ou seja, quando o modelo for alterado, a lista deverá ser atualizada da tabela.
+```html
+class NegociacaoController {
+
+    constructor() {
+
+        let $ = document.querySelector.bind(document);
+        this._inputData = $('#data');
+        this._inputQuantidade = $('#quantidade');
+        this._inputValor = $('#valor');
+
+        this._listaNegociacoes = new ListaNegociacoes();
+        this._negociacoesView = new NegociacoesView($('#negociacoesView'));
+
+
+    }
+```
+A ação não será realizada apenas quando a controller for carregada, mas também quando o adiciona() for chamado. Porque atualizamos a lista, assim que acabamos de adicionar uma nova negociação, temos que solicitar para View que esta se renderize com o novo modelo. Em NegociacoesView.js, faremos com que o método update() recebe o model.
+```html
+update(model) {
+
+    this._elemento.innerHTML = this._template(model);
+}
+```
+Passamos o model como parâmetro do _template().
+```html
+_template(model)
+
+    return `
+    table class="table table-hover table-bordered">
+                <thead>
+                    <tr>
+                        <th>DATA</th>
+                        <th>QUANTIDADE</th>
+                        <th>VALOR</th>
+                        <th>VOLUME</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                </tbody>
+         </table>
+        `;
+      }
+```
+Dentro da tag <tbody>, adicionaremos tags <tr> com base em cada negociação do ListaNegociacoes. Para isto, usaremos uma expressão que conterá o map() - podemos usar, inclusive, uma arrow function.
+```html
+<tbody>
+    ${model.negociacoes.map(n => {
+
+      })}
+</tbody>
+```
+Se adicionarmos um console.log(n) e executarmos o código, a negociação será impressa no Console. Com o return n, será gerada uma nova lista, com base na modificação. O código ficaria assim:
+```html
+<tbody>
+    ${model.negociacoes.map(n => {
+        console.log(n);
+        return n;
+      })}
+</tbody>
+```
+Porém, se selecionarmos esta opção, teremos um problema: a expressão precisa nos devolver uma string, que seja enxertada no template. Seguiremos outro caminho: varreremos cada negociação e usaremos o return de outra template string.
+```html
+<tbody>
+    ${model.negociacoes.map(n => {
+
+      return `
+        <tr>
+            <td>${DateHelper.dataParaTexto(n.data)}</td>
+            <td>${n.quantidade}</td>
+            <td>${n.valor}</td>
+            <td>${n.volume}</td>
+        </tr>
+      `
+      })}
+</tbody>
+```
+Dentro da template string, adicionamos as tags <tr> e <td>, e usamos várias expressões para definirmos a exibição de data, quantidade, valor e volume. Quando o _template() for retornar a string, terá que processar o trecho do return primeiramente, e depois retornar a template string. Para cada negociação será criada uma lista - cada uma com as tags <tr> e os dados cadastrados. Estamos varrendo a lista e para um objeto Negociacao, estamos criando um array, mas o novo elemento será uma string com os dados. No entanto, por enquanto, o retorno será um array. Por isso, adicionaremos o join().
+```html
+<tbody>
+    ${model.negociacoes.map(n => {
+
+      return `
+        <tr>
+            <td>${DateHelper.dataParaTexto(n.data)}</td>
+            <td>${n.quantidade}</td>
+            <td>${n.valor}</td>
+            <td>${n.volume}</td>
+        </tr>
+      `
+      }).join('')}
+</tbody>
+```
+Ao utilizarmos o join(), usamos como critério de junção uma string em branco. Agora, teremos uma string com todos os dados do array concatenados. Vamos ver o que será exibido no navegador, após o preenchimento do formulário:
+
+tabela com valores
+
+Em seguida, adicionaremos uma nova negociação e os dados também serão exibidos na tabela.
+
+tabela com duas negociações
+
+Se completarmos os dados do formulário novamente, a tabela terá dados das três negociações. Observe que não manipulamos o DOM de maneira imperativa, em vez disso, fizemos de maneira declarativa. Nós declaramos o template, ele recebeu um modelo e com base nos dados do modelo, usamos a template string.
+
+Conseguimos de maneira elegante, utilizando apenas recursos do JavaScript, fazer um template render. Porém, faltam algumas ações para que nossa tabela fique completa.
+
+<h2>Enxugando o código</h2>
+
+Faremos um pequeno ajuste que passou despercebido no vídeo anterior, antes de completarmos o código. Deixamos incompleto o fechamento da tag <tr>. Corrigiremos a falha dentro da <tbody>:
+```html
+<tbody>
+    ${model.negociacoes.map(n => {
+
+      return `
+        <tr>
+            <td>${DateHelper.dataParaTexto(n.data)}</td>
+            <td>${n.quantidade}</td>
+            <td>${n.valor}</td>
+            <td>${n.volume}</td>
+        </tr>
+      `
+      })}
+</tbody>
+```
+Felizmente, o navegador entendeu que tratava-se de um tag <tr>. Outro ajuste será na arrow function. Quando trabalhamos com um único retorno, não precisamos usar as chaves ({}). Também podemos remover o return. Veja como nosso código ficará mais enxuto:
+```html
+<tbody>
+    ${model.negociacoes.map(n => `
+
+          <tr>
+            <td>${DateHelper.dataParaTexto(n.data)}</td>
+            <td>${n.quantidade}</td>
+            <td>${n.valor}</td>
+            <td>${n.volume}</td>
+          </tr>
+
+      `)join('')}
+</tbody>
+```
+Facilitamos a leitura do código. Fizemos a declaração do template.
+
+A seguir, trabalharemos com a tag <tfoot>, com a qual criaremos o rodapé.
+
+<h2>Totalizando o volume em nosso Template</h2>
+Vamos trabalhar com o rodapé... Atualmente, o método _template() está assim:
+```html
+_template(model)
+
+    return `
+    table class="table table-hover table-bordered">
+                <thead>
+                    <tr>
+                        <th>DATA</th>
+                        <th>QUANTIDADE</th>
+                        <th>VALOR</th>
+                        <th>VOLUME</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${model.negociacoes.map(n => `
+
+                          <tr>
+                            <td>${DateHelper.dataParaTexto(n.data)}</td>
+                            <td>${n.quantidade}</td>
+                            <td>${n.valor}</td>
+                            <td>${n.volume}</td>
+                          </tr>
+
+                      `)join('')
+                    }
+                </tbody>
+
+                <tfoot>
+                </tfoot>
+
+         </table>
+        `;
+      }
+```
+Para totalizarmos o volume, adicionaremos a tag <td> dentro da <tfoot>:
+```html
+<tfoot>
+    <td colspan="3"></td>
+    <td>0</td>
+</tfoot>
+```
+Observe que utilizamos a colspan com o valor 3, assim teremos três colunas. Usamos também uma <td> que tem o valor igual a 0. Mas se executarmos o código agora, ainda não será totalizado o volume.
+
+volume 0
+
+Para totalizar, poderíamos usar o forEach() e somar cada volume da negociação com uma variável.
+```html
+<tfoot>
+    <td colspan="3"></td>
+    <td>${
+        (function() {
+
+            let total = 0;
+            model.negociacoes.forEach(n => total+= n.volume);
+            return total;
+       })()
+      }
+    </td>
+</tfoot>
+```
+Porém, dentro da expressão, precisamos retornar um valor. Só que quando usamos uma instrução, não podemos adicionar uma sequência de instruções. Seremos espertos e adicionaremos uma função dentro do $. Utilizaremos uma Immediately-invoked function expression (IIFE) ou a função imediata. Trata-se de um recurso usado na criação de escopo em JavaScript, que nos ajudará a colocar um bloco na expressão, sendo executado imediatamente. No caso, o $ receberá o total.
+
+tabela com o volume total
+
+Se testarmos no navegador, já será exibido o total do volume. Mas depois dessa "gambiarra", o código não ficou bonito. É possível fazer a ação de totalização de outra maneira funcional. Veremos mais adiante.
+
+<h2>Totalizando o volume em nosso Template com a função reduce</h2>
+Podemos fazer o código de maneira funcional, sem precisar usar a "gambiarra" feita na tag <tfoot> para exibirmos o total do volume:
+```html
+<tfoot>
+    <td colspan="3"></td>
+    <td>
+      ${
+        (function() {
+
+            let total = 0;
+            model.negociacoes.forEach(n => total+= n.volume);
+            return total;
+      })()
+     }
+   </td>
+</tfoot>
+```
+Vamos mostrar como conseguir o mesmo resultado usando o paradigma funcional e como o JavaScript array é bastante poderoso.
+```html
+<tfoot>
+    <td colspan="3"></td>
+    <td>
+        ${model.negociacoes.reduce(function(total, n) {
+               return total + n.volume;
+         }, 0.0)
+        }
+     </td>
+</tfoot>
+```
+Observe que utilizamos a função reduce(), que irá processar o array e no fim, disponibiliza um único resultado. Primeiramente, não utilizaremos arrow functions. Optamos por passar uma função com as variáveis total e n(elementos da lista) - ambas receberam esses nomes, mas poderíamos ter definido outros. O return que criamos ainda não será suficiente. Qual será o valor inicial de total? Ele deve iniciar de 0 para conseguirmos somá-lo com volume. Por isso, o segundo parâmetro da função reduce() será a inicialização da variável total.
+
+Basicamente, nós pedimos que negociacoes reduzisse. Em seguida, executamos a função para cada item da lista. A variável total começou com o valor igual a 0 e foi somado com o volume. Quando passamos para o segundo item da lista, este pega o valor anterior e o soma com o volume atual. No fim, a função retorna um valor único, que será o resultado de total.
+
+Ao executarmos o código, veremos que ele funciona perfeitamente:
+
+tabela com total 
+
+Temos o valor correto do total. Agora vamos melhorar o código, utilizando a arrow function. No caso, como estamos trabalhando com dois parâmetros, não podemos remover os parênteses, mas podemos eliminar o function. Depois de adicionarmos a flecha, podemos remover as chaves {}. Poderemos também remover o return(). Com as alterações, a tag <tfoot> ficará assim:
+```html
+<tfoot>
+    <td colspan="3"></td>
+    <td>
+        ${ model.negociacoes.reduce((total, n) => total + n.volume, 0.0)}
+    </td>
+<tfoot>
+```
+A função reduce() executará uma arrow function, que recebe como parâmetro as variáveis total e n. Cada vez que varrermos os elementos do array, o total será o que tínhamos (inicializando pelo 0) somado ao volume. No fim, o reduce() retornará o resultado de total. É uma maneira funcional de lidarmos com problema para totalizar o volume. Como a função retornará um único valor, não foi necessário utilizar a IIFE para incluirmos várias instruções dentro do forEach().
+
+Vamos executar o código. Após preenchermos duas vezes o formulário, teremos o valor correto do total de volume.
+
+total volume final
+
+Terminamos o template da tabela. A cada negociação incluída, a informação será exibida para o usuário com base nas informações da lista.
+
+<h2>Resumindo</h2>
+Vamos revisar o que vimos até aqui: implementamos um mecanismo de View dentro da aplicação. Ou seja, nós temos um tabela na qual exibimos os dados da negociação. Mas em vez das marcações estarem no arquivo HTML, estas foram colocadas em uma classe nova chamada NegociacaoView.js.
+
+Como o código da tabela ficou no JavaScript, a View precisou encontrar alguma forma de se renderizar e aparecer no HTML. Por isso, nós criamos uma <div> que leva o id e indicou o ponto no qual o arquivo da tabela será inserido. Para realizar tal ação, a View recebeu um modelo - com qual “tampamos” as lacunas do template.
+
+Nós ainda criamos o método _template(), utilizando a template string. Vimos que podemos gerar expressões mais "rebuscadas" para montar tags <tr> dinamicamente. Usamos novamente a função map() para transformar o conteúdo de um array. Além disso, utilizamos a função join() para poder concatenar todos os itens do array que equivalem às tags <tr> da tabela.
+
+<h2>Dominando o reduce</h2>
+Você já deve ter ouvido falar em somatórios. O somatório de uma lista de números é a soma de todos os números daquela lista, como por exemplo:
+
+let numeros = [1, 2, 3, 4]; // Somatório = 1 + 2 + 3 + 4 = 10
+Um exemplo de função que nos retorne o somatório de um array de números poderia ser assim:
+```html
+function somatorio(array) {
+
+    var resultado = 0;
+    for(let i = 0; i < array.length; i++){
+        resultado = array[i] + resultado;
+    }
+
+    return resultado;
+}
+```
+A mesma coisa usando forEach:
+```html
+function somatorio(array) {
+    let resultado = 0;
+    array.forEach(item => resultado+= item);
+    return resultado;
+}
+```
+Existe um outro conceito matemático conhecido como produtório, que é análogo ao somatório, só que ao invés de somarmos os números , nós os multiplicamos. Por exemplo:
+
+var numeros = [1, 2, 3, 4]; // Produtório = 1 * 2 * 3 * 4 = 24
+Juntando este seu novo conhecimento matemático com o conhecimento de JavaScript adquirido neste capítulo, qual das funções abaixo nos retorna o produtório de um array de números corretamente, usando a função reduce?
+
+R: 
+```html
+let numeros = [1, 2, 3, 4];
+let resultado = numeros.reduce(function(total, num) {
+    return total * num;
+}, 1);
+```
+
+A função reduce recebe dois parâmetros: uma função e um valor inicial. Na função interna ao reduce, o primeiro parâmetro é o valor da última iteração, que neste caso é o total. O segundo parâmetro é o valor da iteração atual, neste caso o novo número que queremos multiplicar.
+
+O reduce executa sua função interna a cada iteração, então no nosso caso ele multiplica o valor anterior (total) pelo valor da iteração atual (num). Como o produtório é a multiplicação de uma sequência de números, no nosso caso o que está acontecendo é o seguinte:
+
+Supondo o array:
+
+var numeros = [1, 2, 3, 4];
+O total se inicia com o valor 1, definido pelo segundo parâmetro da função reduce.
+
+É feita a primeira iteração, pegando o primeiro valor do array (1) :
+
+return total * num; // Leia-se: return 1 * 1 e coloque este valor em total.
+Na segunda iteração, com o segundo valor do array (2):
+
+return total * num; // Leia-se return 1 * 2 e coloque este valor em total, que agora vale 2;
+Na terceira iteração, com o segundo valor do array (3):
+
+return total * num; // Leia-se return 2 * 3 e coloque este valor em total, que agora vale 6;
+Na segunda iteração, com o segundo valor do array (4):
+
+return total * num; // Leia-se return 6 * 4 e coloque este valor em total, que agora vale 24;
+E no final ele devolve para nós o valor 24 , que é o valor esperado do produtório!
+
+
+<h2>Um pouco mais sobre o reduce</h2>
+
+Vejamos um exemplo com reduce que soma todos os números de um array:
+```html
+let numeros = [1,2,3,4];
+
+let resultado = numeros.reduce((anterior, atual) => anterior + atual);
+alert(resultado);
+```
+O resultado é 10. Contudo, muitas vezes queremos começar a operação considerando um valor de inicialização. Por exemplo, queremos realizar a mesma operação, só que dessa vez, queremos começar com o valor 5.
+```html
+let resultado2 = numeros.reduce((anterior, atual) => anterior + atual, 5);
+alert(resultado2);
+```
+Desta vez, o resultado final é 15!
+
+Sendo assim, nada nos impede de fazer o primeiro reduce passando 0:
+```html
+let numeros = [1,2,3,4];
+
+let resultado = numeros.reduce((anterior, atual) => anterior + atual, 0);
+alert(resultado);
+```
+O resultado será 10 também. Mas será que vale a pena passar o segundo parâmetro da função reduce já que neste caso ele não faz diferença? Tudo vai depender do seu gosto.
+
+
+<h2>Dominando o map</h2>
+Qual das funções abaixo aproveita-se dos recursos da função map para obter arrays com os valores dobrados, com valores pela metade e com raiz quadrada de todos os números abaixo, mantendo a ordem apresentada:
+
+```html
+let numeros = [1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121];
+```
+
+R: 
+```html
+let dobro = numeros.map(function(num) {
+    return num * 2;
+});
+let metade = numeros.map(function(num) {
+    return num/2;
+});
+let raiz = numeros.map(function(num) {
+    return Math.sqrt(num);
+});
+```
+ 
+Cada map recebe uma função como parâmetro, e em cada uma dessas funções, utilizamos um parâmetro que é o elemento de cada índice da array que deverá ser retornado em cada iteração.
+
+
+<h2>View declarada no JS ou no HTML?</h2>
+
+Aprendemos a declarar nossas views no mundo JavaScript. Um framework que segue este caminho é o React do Facebook. Contudo, há uma outra abordagem que é declarar as views em arquivos HTML, inclusive o famoso Angularjs faz dessa maneira.
+
+Neste treinamento optei por declarar a view no mundo JS, pois essa solução me permitiu implementar o modelo MVC sem grandes voltas e ainda manter o foco em boas práticas e ES6, tornando o treinamento mais acessível para diversos perfis de "ninjas" em JavaScript.
+
+Um fato curioso é que no React declaramos nossos componentes de view usando o JSX que permite escrever HTML mais facilmente no mundo JS. Apesar de não termos esses recursos, as templates strings do ES6 nos ajudam bastante com nossas declarações e tudo sem precisar de um framework ou biblioteca!
+
+<h1>Generalizando a solução da nossa View</h1>
+
+<h2>Classe Mensagem</h2>
+Nossa aplicação já está funcionando, mas vamos melhorar a experiência do usuário. Quando adicionamos uma negociação, os dados são inseridos na tabela. Nosso objetivo será exibir uma mensagem para o usuário, na qual informaremos que a negociação foi incluída com sucesso. Para fazer isto, vamos criar um novo modelo que chamaremos de Mensagem.js. Nele, adicionaremos um texto e sempre que quisermos exibir uma mensagem, será instanciado um objeto da minha classe Mensagem. O texto que será exibido, ficará guardado nesta classe.
+```html
+class Mensagem {
+
+    constructor() {
+
+      this._texto;
+    }
+
+    get texto() {
+
+        return this._texto;
+
+    }
+}
+```
+Nós usamos a convenção do prefixo _ para manter o _texto privado. Usamos um get que terá um return this._texto.
+
+Nós queremos também ser capazes de alterar o texto, faremos isto, adicionando o set texto(). Assim como temos a opção de usar o get, usaremos o set:
+```html
+set texto(texto) {
+
+    this._texto = texto;
+}
+```
+Mas seria possível aceitar um intervenção como a variável let, como nas linhas abaixo:
+```html
+let mensagem = new Mensagem();
+mensagem.texto = 'x';
+```
+O valor dentro do mensagem.texto será enviado por debaixo dos panos para o método texto() e depois, será atribuído a mensagem. Porém, quando criamos uma mensagem nova, o valor deve estar com uma string em branco. Mas ainda é possível alterar o texto da mensagem em branco:
+
+let mensagem = new Mensagem('xxxx');
+mensagem.texto = 'nova mensagem';
+Temos ainda a opção de já passar a mensagem no constructor():
+```html
+class Mensagem {
+
+    constructor(texto) {
+
+        this._texto = texto;
+    }
+
+    get texto() {
+
+        return this._texto;
+    }
+
+    set texto(texto) {
+
+        this._texto = texto;
+    }
+}
+```
+Agora podemos usar a variável let e passaremos o texto dentro da Mensagem().
+
+let mensagem = new Mensagem('Flávio Almeida');
+console.log(mensagem.texto)
+A mensagem Flávio Almeida poderá ser visualizada no Console, quando executarmos o código. Mas e nos casos em que não sabemos qual será a mensagem do objeto Mensagem()? Qual será o valor padrão do texto? Teremos que passar como parâmetro uma string vazia.
+
+```html
+class Mensagem {
+
+    constructor(texto) {
+
+        this._texto = texto;
+    }
+
+    get texto() {
+
+        return this._texto;
+    }
+
+    set texto(texto) {
+
+        this._texto = texto;
+    }
+}
+```
+let mensagem = new Mensagem('');
+Para resolver a questão, o ES6 permite atribuir um valor padrão para parâmetros do constructor() ou de funções do JS. Se não passarmos no construtor da Mensagem() um texto, ele adotará como padrão uma string em branco.
+```html
+class Mensagem {
+
+    constructor(texto='') {
+
+        this._texto = texto;
+    }
+//...
+```
+Mas se abaixo, adicionamos um texto e Mensagem, ele entende que não poderá usar o valor padrão. Vamos testar o código.
+
+Antes, importaremos o arquivo Mensagem.js em index.html.
+```html
+<script src="js/app/models/Negociacao.js"></script>
+<script src="js/app/controllers/NegociacaoController.js"></script>
+<script src="js/app/helpers/DateHelper.js"></script>
+<script src="js/app/models/ListaNegociacoes.js"></script>
+<script src="js/app/views/NegociacoesView.js"></script>
+<script src="js/app/models/Mensagem.js"></script>
+<script>
+    let negociacaoController = new NegociacaoCOntroller();
+</script>
+```
+Em seguida, digitaremos as seguintes linhas no Console do navegador:
+
+let mensagem = new Mensagem();
+undefined
+mensagem.texto
+""
+Ao imprimirmos o mensagem.texto, o retorno é uma string em branco. Se colocarmos como valor padrão do constructor() o texto Olá, o código fica assim:
+```html
+class Mensagem {
+
+    Constructor(texto='Olá') {
+
+        this._texto = texto;
+    }
+//...
+```
+Ao recarregarmos o Console, o retorno será:
+
+let mensagem = new Mensagem();
+undefined
+mensagem.texto
+"Olá"
+Ele imprimiu o valor padrão. Mas se adotarmos como padrão outro texto,Tchau!, por exemplo, o retorno será diferente.
+
+let mensagem = new Mensagem();
+undefined
+mensagem.texto
+"Tchau!"
+Este é um recurso interessante, porque podemos definir um parâmetro default, tanto no construtor quanro no método.
+
+<h2>Criando a classe MensagemView</h2>
+Criamos o modelo de negociação, agora, criaremos o this._mensagem no NegociacaoController.js:
+```html
+class NegociacaoController {
+
+    constructor() {
+
+        let $ = document.querySelector.bind(document);
+        this._inputData = $('#data');
+        this._inputQuantidade = $('#quantidade');
+        this._inputValor = $('#valor');
+        this._listaNegociacoes = new ListaNegociacoes();
+
+        this._negociacoesView = new NegociacoesView($('#negociacoesView'));
+        this._negociacoesView.update(this._listaNegociacoes);
+        this._mensagem = new Mensagem();
+
+    }
+
+//...
+```
+Sabemos que quando for feita uma adição, queremos dizer que o this._mensagem.texto:
+```html
+adiciona(event) {
+
+    event.preventDefault();
+    this._listaNegociacoes.adiciona(this._criaNegociacao());
+    this._mensagem.texto = 'Negociacao adicionada com sucesso';
+    this._negociacoesView.update(this._listaNegociacoes);  
+    this._limpaFormulario();
+}
+```
+Se preenchermos o formulário, os dados serão inseridos na tabela, mas a mensagem não, porque ainda não foi criada a View da mesma. Faremos isto a seguir.
+
+Na pasta views, criaremos o arquivo MensagemView.js:
+```html
+class MensagemView {
+
+  constructor(elemento) {
+        this._elemento = elemento;
+  }
+
+  _template(model) {
+
+    return `<p class="alert alert-info">${model.texto}</p>`;
+  }
+}
+```
+Usaremos o alert alert-info do bootstrap, seguido pela expressão ${model.texto}.
+
+Logo abaixo, adicionaremos o método update() que receberá o model.
+```html
+update(model) {
+
+    this._elemento.innerHTML = this._template(model);
+}
+```
+Vamos agora, importar a View no index.html:
+```html
+<script src="js/app/models/Negociacao.js"></script>
+<script src="js/app/controllers/NegociacaoController.js"></script>
+<script src="js/app/helpers/DateHelper.js"></script>
+<script src="js/app/models/ListaNegociacoes.js"></script>
+<script src="js/app/views/NegociacoesView.js"></script>
+<script src="js/app/models/Mensagem.js"></script>
+<script src="js/app/views/MensagemView.js"></script>
+<script>
+    let negociacaoController = new NegociacaoController();
+</script>
+```
+No NegociacoesController.js, colocaremos a View assim que a página for recarregada:
+```html
+class NegociacaoController {
+
+    constructor() {
+
+        let $ = document.querySelector.bind(document);
+        this._inputData = $('#data');
+        this._inputQuantidade = $('#quantidade');
+        this._inputValor = $('#valor');
+        this._listaNegociacoes = new ListaNegociacoes();
+
+        this._negociacoesView = new NegociacoesView($('#negociacoesView'));
+        this._negociacoesView.update(this._listaNegociacoes);
+
+        this._mensagem = new Mensagem();
+        this._mensagemView = new MensagemView();
+
+    }
+
+//...
+```
+O MensagemView recebeu onde queremos incluir a mensagem no HTML. De volta ao index.html, vamos colocar a mensagem antes da tag <form>:
+```html
+<body class="container">
+
+    <h1 class="text-center">Negociações</h1>
+
+    <div id="mensagemView"></div>
+
+    <form class="form" onsubmit="negociacaoController.adiciona(event)">
+
+<!-- ... -->
+```
+Depois, precisaremos pegar o elemento do DOM no NegociacaoController.js, adicionando o $.
+```html
+this._mensagem = new Mensagem();
+this._mensagemView = new MensagemView($('#mensagemView'));
+this._mensagemView.update(this._mensagem);
+```
+Usamos o update e dentro passamos o this._mensagem. Vamos incluir o this._negociacoesView também no método adiciona():
+```html
+adiciona(event) {
+
+    event.preventDefault();
+    this._listaNegociacoes.adiciona(this._criaNegociacao());
+    this._negociacoesView.update(this._listaNegociacoes);
+
+    this._mensagem.texto = 'Negociacao adicionada com sucesso';
+    this._mensagemView.update(this._mensagem);  
+
+    this._limpaFormulario();
+}
+```
+Vamos ver se algo já é exibido no navegador.
+
+barra azul
+
+Agora aparece um barra com um fundo azul, isto é uma mensagem do bootstrap vazia. A mensagem não deveria estar sendo exibida, considerando que a nossa string está em branco. Vamos testar cadastrar uma nova negociação no formulário.
+
+cadastro com sucesso
+
+Conseguimos adicionar os dados a tabela e a mensagem de sucesso apareceu corretamente. Veja que conseguimos usar o mesmo mecanismo de criação da View para lidar com as mensagens do sistema. As ações de importar e apagar negociações podem ser associadas com a atualização de mensagem. Quando chamarmos o updatena View, passando o model, este atualizará a tela. Mas queremos retirar o parágrafo com o fundo azul que aparece acima do formulário. Resolveremos isso em MensagemView.js.
+
+Na classe _template, faremos um if ternário:
+```html
+_template(model) {
+
+    return model.texto ? `<p class="alert alert-info">${model.texto}</p>` : '<p></p>';
+}
+```
+Nós vamos retornar um parágrafo sem a classe. Em JavaScript, uma string sem conteúdo é avaliada como falso. Podemos testar se o modelo.texto é uma string em branco, 0 ou null, nesses casos, a resposta é falso. Mas se tiver texto, vai dar verdadeiro e o retorno será o template. Caso contrário, o retorno será um parágrafo sem a classe alert-info e, consequentemente, sem a tarja azul. Se inspecionamos o elemento do DOM no Console, vemos que o paragrafo está vazio:
+```html
+<div id="mensagemView">
+    <p></p>
+</div>
+```
+Não aparece a classe do bootstrap. Mas se cadastramos a negociação no formulário, a mensagem aparecerá corretamente. Conseguimos resolver a parte das mensagens para o usuário. Mas será que conseguimos melhorar ainda mais o código?
+
+
+<h2>Herança e reutilização de código</h2>
+Temos duas Views criadas: MensagemView e NegociacoesView. Se observarmos, ambas posuem um construtor que recebe um elemento, além de possuir a propriedade elemento. As duas têm os métodos _template e update, que são bem semelhantes. A diferença está na forma em que o método _template foi implementado e o seu retorno. E se aumentarmos o número de Views, teremos que ter mais updates. Atualmente, o método update do NegociacoesView está assim:
+```html
+update(model) {
+
+    this._elemento.innerHTML = this._template(model);
+}
+```
+Se nos enganamos e escrevermos innerHtml, com as letras de HTMLem caixa baixa, teremos problemas na execução do código. Para evitarmos a repetição, vamos colocar o que as classes têm em comum, apenas em uma, a nova classe receberá o nome de View.
+```html
+class View {
+
+    constructor(elemento) {
+
+          this._elemento = elemento;
+    }
+
+    update(model) {
+
+        this._elemento.innerHTML = this._template(model);
+    }
+}
+```
+A classe View recebeu tudo o que as Views tinham em comum: um constructor(elemento) - que guardará internamente um elemento - e update(). Lembrando que o método _template possui algumas diferenças nas classe. Depois, removeremos os métodos constructor() e update().
+
+Em seguida, para evitarmos duplicar o código, faremos com que MensagemView herde todas as características de View. Como em JavaScript trabalhamos com o conceito da orientação a objetos que é herança? Podemos dizer que a MensagemView é uma View:
+```html
+class MensagemView extends View {
+
+  _template(model) {
+
+      return model.texto ? `<p class="alert alert-info">${model.texto}</p>` : '<p></p>';
+  }
+}
+```
+Faremos o mesmo com NegociacoesView:
+```html
+class NegociacaoView extends View {
+
+    _template(model) {
+
+      return `
+      <table class="table table-hover table-bordered">
+          <thead>
+              <tr>
+                  <th>DATA</th>
+                  <th>QUANTIDADE</th>
+                  <th>VALOR</th>
+                  <th>VOLUME</th>
+              </tr>
+          </thead>
+//...
+```
+Vamos carregar a View no index.html.
+```html
+<script src="js/app/models/Negociacao.js"></script>
+<script src="js/app/controllers/NegociacaoController.js"></script>
+<script src="js/app/helpers/DateHelper.js"></script>
+<script src="js/app/models/ListaNegociacoes.js"></script>
+<script src="js/app/views/View.js"></script>
+<script src="js/app/views/NegociacoesView.js"></script>
+<script src="js/app/models/Mensagem.js"></script>
+<script src="js/app/views/MensagemView.js"></script>
+<script>
+    let negociacaoController = new NegociacaoController();
+</script>
+```
+Observe que ao carregarmos os scripts, devemos posicionar a View antes das outras Views dependentes. Se a View for carregada por última, no navegador veremos uma mensagem de erro que nos dirá: View is not defined, porque na definição da classe estamos usando herança nas duas Views.
+
+Se digitarmos a seguinte linha no Console...
+
+let v = new NegociacoesView()
+Tudo funcionará corretamente e o arquivo NegociacoesView herdará de View o método update(). Apesar de termos removido o método, ele está sendo invocado. Mas quando carregamos NegociacoesView e MensagemView, precisamos ter um constructor() que recebe o elemento. O construtor chamará o super() - fazendo referência ao super class, a classe pai. Com as alterações, o NegociacoesView ficará assim:
+```html
+class NegociacoesView extends View {
+
+    constructor(elemento) {
+        super(elemento);
+    }
+//...
+```
+E o MensagemView ficará da seguinte maneira:
+```html
+class MensagemView extends View {
+
+    constructor(elemento) {
+        super(elemento);
+    }
+//...
+```
+Se cadastrarmos uma nova negociação, veremos que está tudo funcionando.
+
+formulario funcionando corretamente
+
+Mas, só encontraremos o método update na View. Para que as duas Views pudessem herdar da classe View, seria necessário adicionarmos no NegociacaoView o MensagemView e o extends.
+
+Evitamos a duplicação do código, mas será que existe alguma outra falha? Veremos mais adiante.
+
+<h2>Construtor vs super</h2>
+
+Se definimos que "para a criação de uma View, esta deverá herdar de View", pode ocorrer que o desenvolvedor esqueça de implementar o método _template. O arquivo MensagemView ficaria assim:
+```html
+class MensagemView extends View {
+
+    constructor(elemento) {
+        super(elemento);
+    }
+}
+```
+Se executarmos o código no navegador, teremos um erro.
+
+erro no Console
+
+O erro ocorrerá porque o método update depende do _template() para funcionar. E na classe View, não podemos definir a implementação do método, considerando que este sofre variações nas classes filhas, logo, estas serão as responsáveis por definir o _template(). Por isso, vamos encontrar uma forma de lembrar ao desenvolvedor que ele deve usar o método _template().
+
+No arquivo View.js, vamos adicionar o _template(), que lançará um new Error.
+```html
+_template() {
+    throw new Error('O método template deve ser implementado');
+}
+```
+A mensagem informará que o método template deve ser implementado. Mas se NegociacoesView possui um método definido com o nome _template() - também utilizado na classe pai - a classe filha irá sobrescrevê-lo. Isto significa que o método válido é o _template() de NegociacoesView. O mesmo ocorrerá com MensagemView. Desta forma, a mensagem de erro só será adicionada caso o desenvolvedor se esqueça de implementar o método nas Views.
+
+mensagem template deve ser implementado
+
+Como não adicionamos o _template() no MensagemView.js, fomos avisados no Console.
+
+Na linguagem JavaScript, não existem classes abstratas e, por isso, não podemos obrigar as classes filhas a implementarem o _template(). Explicado isto, vamos adicionar novamente o método _template() no MensagemView.js:
+```html
+class MensagemView extends View {
+
+    constructor(elemento) {
+        super(elemento);
+    }
+
+    _template(model) {
+
+        return model.texto ? `<p class="alert alert-info">${model.texto}</p>` : '<p></p>';
+    }
+}
+```
+A mensagem de erro não será exibida quando recarregarmos a página no navegador. Para finalizar, faremos um pequeno ajuste. Como foi convencionado, ao usarmos o prefixo _ no nome do método _template(), mesmo as classes filhas não poderiam chamar o método. Apenas a classe pai deveria ter este acesso. Por isso, vamos remover o _ de todas as referências ao método _template.
+
+O trecho referente em View.js ficará assim:
+```html
+template(model) {
+
+    return model.texto ? `<p class="alert alert-info">${model.texto}</p>` : '<p></p>';
+}
+
+update(model) {
+    this._elemento.innerHTML = this.template(model);
+}
+```
+Em NegociacoesView, o método template() ficará assim:
+```html
+template(model) {
+
+      return `
+      <table class="table table-hover table-bordered">
+                  <thead>
+                      <tr>
+                          <th>DATA</th>
+                          <th>QUANTIDADE</th>
+                          <th>VALOR</th>
+                          <th>VOLUME</th>
+                      </tr>
+                  </thead>
+//...
+```
+E por último, em MensagemView:
+```html
+template(model) {
+
+    return model.texto ? `<p class="alert alert-info">${model.texto}</p>` : '<p></p>';
+}
+```
+Se tivéssemos mantido o prefixo _, o código funcionaria corretamente. Mas como se trata de uma indicação de private, por convenção, as classes filhas não poderiam sobescrever o método. Com isto, organizamos o nosso código baseados em herança.
+
+<h2>Resumindo</h2>
+Vimos que o código das Views NegociacoesView e MensagemView tinham trechos em comum. Nós isolamos tais partes dentro de uma classe, juntamente com o construtor que recebeu o elemento e o método update(). Depois, fizemos com que as duas Views herdassem da classe View, assim, não repetimos o código em comum. Mas coube às classes filhas implementarem o método template().
+
+Criamos ainda uma "armadilha" para evitar a possibilidade de que o desenvolvedor se esquecesse de incluir o método, incluindo uma mensagem de erro no Console. Lembrando que um método da classe filha sobrescreve métodos da classe pai.
+
+Depois, adicionamos o constructor() nas classes filhas com o super, que passava o parâmetro para a classe pai. Fizemos também um pequeno ajuste, retirando o prefixo _ do método template(), que anteriormente era privado. A alteração foi necessária porque os métodos template() de NegociacoesView eMensagemView precisavam sobrescrever o método em View.
+
+Aguardamos você na segunda parte do curso.
+
