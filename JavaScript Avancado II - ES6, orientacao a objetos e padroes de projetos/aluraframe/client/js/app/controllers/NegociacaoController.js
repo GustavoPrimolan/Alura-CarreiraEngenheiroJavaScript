@@ -16,7 +16,9 @@ class NegociacaoController {
         //COM A ARROW FUNCTION IRÁ FUNCIONAR SEM PRECISAR PASSAR O PARâMETRO DO CONTEXTO
         //POIS O ESCOPO DA ARROW FUNCTION É DINÂMICO, FAZENDO COM QUE O THIS SEJA EXECUTADO DA
         //CLASSE CHAMADORA
-        this._listaNegociacoes = new ListaNegociacoes(model => this._negociacoesView.update(model));
+        
+        //COMENTADO POIS A ARMADILHA FOI RETIRADA DA CLASSE
+        //this._listaNegociacoes = new ListaNegociacoes(model => this._negociacoesView.update(model));
         
         this._negociacoesView = new NegociacoesView($('#negociacoesView'));
         this._negociacoesView.update(this._listaNegociacoes);

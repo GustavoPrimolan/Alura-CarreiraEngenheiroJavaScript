@@ -771,3 +771,150 @@ No contexto da nossa aplicação, entendemos um evento como o ato de adicionar ou 
 
 <h2>Modelo e retutilização em projetos</h2>
 
+Para liberarmos o desenvolvedor da responsabilidade de atualizar programaticamente a View sempre que o modelo fosse atualizado, nós colocamos "armadilhas": funções que eram chamadas quando métodos específicos eram executados. Desta forma, chamávamos automaticamente a atualização da View. Nós declaramos o modelo no inicio, definimos as ações que deveriam acontecer quando ocorria a modificação, e assim liberamos o desenvolvedor da responsabilidade.
+
+No entanto, esta solução deixa a desejar porque coloca código de infraestrutura - ou seja, de atualização da View - no modelo. Geralmente, a parte mais reutilizada de um sistema é o modelo. Então, ao acessarmos um modelo de negociação e encontrarmos um atributo chamado _armadilha, por exemplo:
+```html
+class ListaNegociacoes {
+
+    constructor(armadilha) {
+
+        this._negociacoes = [];
+        this._armadilha = armadilha;
+    }
+//...
+
+```
+O que _armadilha tem a ver com a lista de negociação? Ela foi usada apenas para aplicar o artifício que chama a View automaticamente. E se tivéssemos outros métodos que quiséssemos monitorar e executar uma armadilha? Teríamos que alterar a classe do modelo. Então, o modelo é a parte mais reutilizável. Se agora não quisermos mais utilizar um sistema baseado em MVC, podemos optar em usar o AngularJS ou outro framework.
+
+Mas se começamos a incluir diversos itens de infraestrutura, de recursos para que ela gere benefícios - como a atualização de View - começamos a não reutilizar continuamente o modelo. Encontraremos uma forma de manter o modelo intacto, sem utilizarmos armadilhas e ainda assim, conseguir executar um código arbitrário quando algum método for chamado. A seguir, encontraremos uma solução para a questão.
+
+<h2>O padrão de projeto Proxy</h2>
+
+Veremos qual é a solução que nos permite manter o modelo... Começaremos retirando o _armadilha de ListaNegociacoes:
+```html
+
+class ListaNegociacoes {
+
+  constructor() {
+
+        this._negociacoes = [];
+  }
+  adiciona(negociacao) {
+      this._negociacoes.push(negociacao);
+  }
+
+  get negociacoes() {
+      return [].concat(this._negociacoes);
+  }
+
+  esvazia() {
+      this._negociacoes = [];
+  }
+}
+
+```
+Como removemos o _armadilha, o construtor de NegociacaoController deixará de funcionar e descobriremos uma forma de resolver problema da View. Temos ainda outro problema com a solução que usa o _armadilha: se quisermos monitorar os models Mensagem e Negociacoes, teremos que abrir a classe para alterar e colocar a armadilha - mas, não faremos isto.
+
+Existe um famoso padrão de projeto chamado Proxy, que de forma resumida, é "um cara mentiroso". Vimos que não é bom inserirmos armadilhas na classe, porque estaremos perdendo a reutilização do modelo e teremos que repetir em todos os modelos do sistema. No entanto, o Proxy é idêntico ao objeto que queremos trabalhar, e teremos bastante dificuldade de diferenciá-los. Nós acessamos o Proxy como se ele fosse o objeto real, este último ficará escondido dentro do outro. Nós substituímos o objeto real, que só poderá ser acessado por meio do Proxy - que pode ou não ser executado em um código arbitrário se assim definirmos.
+
+Observe que ListaNegociacoes tem o métodos adiciona() e negociacoes(), que também estarão presentes no Proxy.
+
+```html
+class ListaNegociacoes {
+
+  constructor(armadilha) {
+
+        this._negociacoes = [];
+        this._armadilha = armadilha;
+  }
+  adiciona(negociacao) {
+      this._negociacoes.push(negociacao);
+      this._armadilha(this);
+  }
+
+  get negociacoes() {
+      return [].concat(this._negociacoes);
+  }
+
+  esvazia() {
+      this._negociacoes = [];
+      this._armadilha(this);
+  }
+
+```
+A diferença está em que quando chamarmos o adiciona(), o Proxy delegará a chamada do método para o objeto encapsulado por ele. Mas ainda não temos benefícios com esta mudança. A vantagem está que colocaremos as armadilhas entre a chamada do Proxy e o objeto real. Toda vez que acessamos o Proxy, executaremos um código antes de chamarmos um método ou propriedade correspondente ao objeto real.
+
+A boa notícia é que não precisamos implementar esse padrão de projeto.
+
+A partir da versão 2015 do ECMAScript, a própria linguagem já possui um recurso de Proxy. Então, implementaremos o padrão de projeto Proxy usando o ES6.
+
+
+
+<h2>Aprendendo a trabalhar com o Proxy</h2>
+
+Vamos aprender a trabalhar com o Proxy. Começaremos comentando o código de NegociacaoController, porque ele não está válido devido a remoção da armadilha passada para o construtor.
+```html
+
+class NegociacaoController {
+
+    constructor() {
+
+        let $ = document.querySelector.bind(document);
+        this._inputData = $('#data');
+        this._inputQuantidade = $('#quantidade');
+        this._inputValor = $('#valor');
+
+        /*
+        this._listaNegociacoes = 
+            new ListaNegociacoes(model => this._negociacoesView.update(model));
+            */
+//...
+
+```
+Depois, abriremos o Console no navegador. Veremos uma mensagem de erro, porque a negociação está com problema. Começaremos criando um negociacao:
+```html
+let negociacao = new Negociacao(new Date(), 1, 100);
+undefined
+let negociacaoProxy = new Proxy(negociacao, {});
+```
+
+Criaremos um Proxy de negociacao. O segundo parâmetro é um objeto no formato literal {}, em que iremos configurar nossas armadilhas. Em seguida, digitaremos a seguinte linha:
+
+negocicacaoProxy.valor
+100
+Ao acessarmos valor, o retorno será 100. Conseguimos ter acesso a quantidade e volume:
+
+negocicacaoProxy.valor
+100
+negociacaoProxy.quantidade
+1
+negocicacaoProxy.volume
+100
+O Proxy terá exatamente o mesmo comportamento do objeto.
+
+Proxy no console
+
+No entanto, não queremos que o ninguém tenha acesso ao objeto real (negociacao), caso contrário, ninguém cairá nas armadilhas. Para isto, executaremos a seguinte linha no Console:
+
+let negociacao = new Proxy(new Negociacao(new Date(), 1, 100), {});
+Neste caso, negociacao é o Proxy:
+
+negociacao é o Proxy
+
+Agora, a única maneira de lidar com a instância de negociação criada é por intermédio do Proxy. Precisamos aprender como passamos o handlers ({}) para colocarmos nossas armadilhas. Adicionaremos outra tag <script> no index.html e depois, colocaremos o código que executamos no Console.
+```html
+
+<script>
+
+    let negociacao = new Proxy(new Negociacao(new Date(), 2, 100), {
+
+      });
+
+</script>
+```
+
+Mais adiante, definiremos o handler.
+
+<h2>Construindo armadilhas de leitura</h2>
+

@@ -9,7 +9,7 @@ class ListaNegociacoes {
     //APENAS NECESSÁRIO UTILIZAR A ARROW FUNCTION NA HORA DA CHAMADA
     constructor(armadilha) {
         this._negociacoes = [];
-        this._armadilha = armadilha;
+        //this._armadilha = armadilha;
         //this._contexto = contexto;
     }
     
@@ -26,7 +26,7 @@ class ListaNegociacoes {
     	//TEM QUE SER PASSADO DENTRO DE UM ARRAY
     	//Reflect.apply(this._armadilha, this._contexto, [this]);
 
-    	this._armadilha(this);
+    	//this._armadilha(this);
     }
     
     get negociacoes() {
@@ -37,6 +37,6 @@ class ListaNegociacoes {
     esvazia() {
     	this._negociacoes = [];
     	
-    	this._armadilha(this);
+    	//this._armadilha(this);
     }
 }
